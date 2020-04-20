@@ -1,4 +1,4 @@
-# Linux-Fake-Background-Webcam
+# Linux-Simple-Fake-Background-Webcam
 
 ## Background
 Video conferencing software support under Linux is relatively poor. The Linux
@@ -8,15 +8,7 @@ version of Microsoft Team does not support background blur.
 Benjamen Elder wrote a
 [blog post](https://elder.dev/posts/open-source-virtual-background/), describing
 a background replacement solution using Python, OpenCV, Tensorflow and Node.js.
-The scripts in Elder's blogpost do not work out of box. In this repository, I
-tidied up his scripts, and provide a turn-key solution for creating a virtual
-webcam with background replacement and additionally foreground object placement,
-e.g. a podium. 
-
-Rather than using GPU for acceleration as described by the original blog post, 
-this version if CPU-only to avoid all the unnecessary complexities. By 
-downscaling the image sent to bodypix neural network, and upscaling the 
-received mask, this whole setup runs sufficiently fast under Intel i7-4900MQ. 
+The scripts in Elder's blogpost do not work out of box. Better and smarter devs have made his approach work (e.g. allo-'s https://github.com/allo-/simple_bodypix_python and fangfufu's https://github.com/fangfufu/Linux-Fake-Background-Webcam). While their approach is technically superior, I wanted to implement a simplistic approach that (hopefully) is a bit less CPU intensive. The results are what you expect, worse.
 
 ## Prerequisite
 You need to install v4l2loopback. If you are on Debian Buster, you can do the
@@ -27,7 +19,7 @@ following:
 I added module options for v4l2loopback by creating
 ``/etc/modprobe.d/v4l2loopback.conf`` with the following content:
 
-    options v4l2loopback devices=1  exclusive_caps=1 video_nr=2 card_label="v4l2loopback"
+    options v4l2loopback devices=1  exclusive_caps=1 video_nr=5 card_label="v4l2loopback"
     
 ``exclusive_caps`` is required by some programs, e.g. Zoom and Chrome.
 ``video_nr`` specifies which ``/dev/video*`` file is the v4l2loopback device.
@@ -41,27 +33,8 @@ I also created ``/etc/modules-load.d/v4l2loopback`` with the following content:
 This automatically loads v4l2loopback module at boot, with the specified module
 options.
 
-## Installing with Docker
-Please refer to [DOCKER.md](DOCKER.md). The updated Docker related scripts were 
-added by [liske](https://github.com/liske).
-
-
-## Installing without Docker
-Please also make sure that your TCP port ``127.0.0.1:9000`` is free, as we will
-be using it.
-
-You need to have Node.js. Node.js version 12 is known to work. 
-
-You will need Python 3. You need to have pip installed. Please make sure that 
-you have installed the correct version pip, if you have both Python 2 and 
-Python 3 installed. Please make sure that the command ``pip3`` runs.
-
-I am assuming that you have set up your user environment properly, and when you
-install Python packages, they will be installed locally within your home
-directory.
-
-You might want to add the following line in your ``.profile``. This line is
-needed for Debian Buster.
+## Installing
+I have removed all tensorflow references, so you won't need docker or open ports.
 
     export PATH="$HOME/.local/bin":$PATH
 
@@ -69,13 +42,7 @@ needed for Debian Buster.
 Run ``./install.sh``.
 
 ### Usage
-You need to open two terminal windows. In one terminal window, do the following:
-
-    cd bodypix
-    node app.js
-
-In the other terminal window, do the following:
-
+On a open terminal window, do
     cd fakecam
     python3 fake.py
 
