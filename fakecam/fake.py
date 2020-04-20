@@ -17,10 +17,13 @@ cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 cap.set(cv2.CAP_PROP_FPS, 30)
 
+# Curses screen
+stdscr = curses.initscr()
+
 # The scale factor for image sent to bodypix
 sf = 0.5
-# Threshold value
-DELTA_THRESHOLD = 30;
+## Threshold value
+##DELTA_THRESHOLD = 15;
 # Background averaging
 BACK_AVG = 30; 
 
@@ -64,14 +67,25 @@ def load_images():
 
 def handler(signal_received, frame):
     load_images();
-    print('Reloaded the virtual_background and foreground images')
+    stdscr.addstr('Reloaded the virtual_background and foreground images\n')
 
 def get_mask(frame, real_background):
     mask = cv2.absdiff(frame, real_background);
     mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY);
-    mask = cv2.threshold(mask, DELTA_THRESHOLD, 1, cv2.THRESH_BINARY)[1];
+#    mask = cv2.blur(mask.astype(np.uint8), (30,30));
+    mask = cv2.GaussianBlur(mask,(15,15),0);
+    ret,mask = cv2.threshold(mask, 0 , 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU);
+#    stdscr.addstr('Return = '+str(ret)+'\n');
+#    mask = cv2.threshold(mask, DELTA_THRESHOLD, 1, cv2.THRESH_BINARY)[1];
+#    mask = cv2.adaptiveThreshold(mask,1,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
+#            cv2.THRESH_BINARY,15,0)
+#    mask = cv2.erode(mask, np.ones((10,10), np.uint8) , iterations=1);
+#    mask = cv2.dilate(mask, np.ones((10,10), np.uint8) , iterations=1);
+    mask = cv2.dilate(mask, np.ones((60,60), np.uint8) , iterations=1);
+    mask = cv2.erode(mask, np.ones((60,60), np.uint8) , iterations=1);
     mask = cv2.dilate(mask, np.ones((15,15), np.uint8) , iterations=1);
-    mask = cv2.blur(mask.astype(float), (30,30));
+    mask = cv2.normalize(mask.astype('float'), None, 0.0, 1.0, cv2.NORM_MINMAX);
+    mask = cv2.GaussianBlur(mask,(31,31),0);
     return mask
 
 def get_frame(cap, real_background, virtual_background):
@@ -83,7 +97,7 @@ def get_frame(cap, real_background, virtual_background):
         try:
             mask = get_mask(frame, real_background);
         except:
-            print("mask request failed, retrying")
+            stdscr.addstr('mask request failed, retrying\n')
 
     # composite the foreground and virtual_background
     for c in range(frame.shape[2]):
@@ -96,7 +110,6 @@ def get_frame(cap, real_background, virtual_background):
 
 if __name__ == '__main__':
 #    signal(SIGINT, handler)
-    stdscr = curses.initscr()
 #    height, width = stdscr.getmaxyx()
     
     stdscr.addstr('Simple fake camera\n')
