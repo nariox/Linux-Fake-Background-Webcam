@@ -6,6 +6,10 @@ import pyfakewebcam
 from signal import signal, SIGINT
 from sys import exit
 
+import curses
+
+
+
 # setup access to the *real* webcam
 cap = cv2.VideoCapture('/dev/video0')
 height, width = 720, 1280
@@ -15,25 +19,38 @@ cap.set(cv2.CAP_PROP_FPS, 30)
 
 # The scale factor for image sent to bodypix
 sf = 0.5
+# Threshold value
+DELTA_THRESHOLD = 30;
+# Background averaging
+BACK_AVG = 30; 
 
 # setup the fake camera
-fake = pyfakewebcam.FakeWebcam('/dev/video2', width, height)
+fake = pyfakewebcam.FakeWebcam('/dev/video5', width, height)
 
 # declare global variables
-background = None
+real_background = None
+virtual_background = None
 foreground = None
 f_mask = None
 inv_f_mask = None
 
 def load_images():
-    global background
+    global virtual_background
+    global real_background
     global foreground
     global f_mask
     global inv_f_mask
 
+    # load real background
+    frames = []
+    for _ in range(BACK_AVG):
+        _,frame = cap.read();
+        frames.append(frame);
+    real_background=np.median(frames, axis=0).astype(dtype=np.uint8);
+    
     # load the virtual background
-    background = cv2.imread("background.jpg")
-    background = cv2.resize(background, (width, height))
+    virtual_background = cv2.imread("background.jpg")
+    virtual_background = cv2.resize(virtual_background, (width, height))
 
     foreground = cv2.imread("foreground.jpg")
     foreground = cv2.resize(foreground, (width, height))
@@ -46,51 +63,31 @@ def load_images():
     inv_f_mask = 1 - f_mask
 
 def handler(signal_received, frame):
-    load_images()
-    print('Reloaded the background and foreground images')
+    load_images();
+    print('Reloaded the virtual_background and foreground images')
 
-def get_mask(frame, bodypix_url='http://127.0.0.1:9000'):
-    frame = cv2.resize(frame, (0, 0), fx=sf, fy=sf)
-    _, data = cv2.imencode(".png", frame)
-    r = requests.post(
-        url=bodypix_url,
-        data=data.tobytes(),
-        headers={'Content-Type': 'application/octet-stream'})
-    mask = np.frombuffer(r.content, dtype=np.uint8)
-    mask = mask.reshape((frame.shape[0], frame.shape[1]))
-    mask = cv2.resize(mask, (0, 0), fx=1/sf, fy=1/sf,
-                      interpolation=cv2.INTER_NEAREST)
-    mask = cv2.dilate(mask, np.ones((20,20), np.uint8) , iterations=1)
-    mask = cv2.blur(mask.astype(float), (30,30))
+def get_mask(frame, real_background):
+    mask = cv2.absdiff(frame, real_background);
+    mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY);
+    mask = cv2.threshold(mask, DELTA_THRESHOLD, 1, cv2.THRESH_BINARY)[1];
+    mask = cv2.dilate(mask, np.ones((15,15), np.uint8) , iterations=1);
+    mask = cv2.blur(mask.astype(float), (30,30));
     return mask
 
-def shift_image(img, dx, dy):
-    img = np.roll(img, dy, axis=0)
-    img = np.roll(img, dx, axis=1)
-    if dy>0:
-        img[:dy, :] = 0
-    elif dy<0:
-        img[dy:, :] = 0
-    if dx>0:
-        img[:, :dx] = 0
-    elif dx<0:
-        img[:, dx:] = 0
-    return img
-
-def get_frame(cap, background):
-    _, frame = cap.read()
+def get_frame(cap, real_background, virtual_background):
+    _,frame = cap.read();
     # fetch the mask with retries (the app needs to warmup and we're lazy)
     # e v e n t u a l l y c o n s i s t e n t
     mask = None
     while mask is None:
         try:
-            mask = get_mask(frame)
+            mask = get_mask(frame, real_background);
         except:
             print("mask request failed, retrying")
 
-    # composite the foreground and background
+    # composite the foreground and virtual_background
     for c in range(frame.shape[2]):
-        frame[:,:,c] = frame[:,:,c] * mask + background[:,:,c] * (1 - mask)
+        frame[:,:,c] = frame[:,:,c] * mask + virtual_background[:,:,c] * (1 - mask)
 
     for c in range(frame.shape[2]):
         frame[:,:,c] = frame[:,:,c] * inv_f_mask + foreground[:,:,c] * f_mask
@@ -98,14 +95,29 @@ def get_frame(cap, background):
     return frame
 
 if __name__ == '__main__':
-    load_images()
-    signal(SIGINT, handler)
-    print('Running...')
-    print('Please press CTRL-\ to exit.')
-    print('Please CTRL-C to reload the background and foreground images')
+#    signal(SIGINT, handler)
+    stdscr = curses.initscr()
+#    height, width = stdscr.getmaxyx()
+    
+    stdscr.addstr('Simple fake camera\n')
+    stdscr.addstr('Press any key to capture virtual_background\n');
+    curses.noecho();
+    stdscr.getch();
+    stdscr.nodelay(1);
+    
+    load_images();
+    stdscr.addstr('Running...\n')
+    stdscr.addstr('Please press CTRL-\ to exit.\n')
+    stdscr.addstr('Please CTRL-C to reload the virtual_background and foreground images\n')
+    stdscr.refresh()
+
+#    curses.noecho() # Dont show inputs
     # frames forever
     while True:
-        frame = get_frame(cap, background)
+#        curses.cbreak()
+#        signal(SIGINT, handler)
+        frame = get_frame(cap, real_background, virtual_background)
+#        _,frame = cap.read()
         # fake webcam expects RGB
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         fake.schedule_frame(frame)
