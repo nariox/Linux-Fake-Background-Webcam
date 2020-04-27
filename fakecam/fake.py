@@ -17,6 +17,10 @@ cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 cap.set(cv2.CAP_PROP_FPS, 30)
 
+# In case the real webcam does not support the requested mode.
+height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+
 # Curses screen
 stdscr = curses.initscr()
 
