@@ -15,6 +15,8 @@ You need to install v4l2loopback. If you are on Debian Buster, you can do the
 following:
     
     sudo apt install v4l2loopback-dkms
+    
+It is also available in AUR at https://aur.archlinux.org/packages/v4l2loopback-dkms/
 
 I added module options for v4l2loopback by creating
 ``/etc/modprobe.d/v4l2loopback.conf`` with the following content:
@@ -33,18 +35,17 @@ I also created ``/etc/modules-load.d/v4l2loopback`` with the following content:
 This automatically loads v4l2loopback module at boot, with the specified module
 options.
 
-## Installing
-I have removed all tensorflow references, so you won't need docker or open ports.
-
-    export PATH="$HOME/.local/bin":$PATH
-
-### Installation
-Run ``./install.sh``.
-
 ### Usage
 On a open terminal window, do
+
     cd fakecam
-    python3 fake.py
+    python3 fake2.py
+
+While the program is running, you may press:
+
+  - 'u' to refresh background
+  - 'v' to reload your virtual background
+  - 'q' to quit.
 
 The files that you might want to replace are the followings:
 
