@@ -3,12 +3,7 @@ import cv2
 import numpy as np
 import requests
 import pyfakewebcam
-from signal import signal, SIGINT
-from sys import exit
-
 import curses
-
-
 
 # setup access to the *real* webcam
 cap = cv2.VideoCapture('/dev/video2')
@@ -23,13 +18,6 @@ cap.set(cv2.CAP_PROP_FPS, 30)
 height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 
-# Curses screen
-stdscr = curses.initscr()
-
-# The scale factor for image sent to bodypix
-sf = 0.5
-## Threshold value
-##DELTA_THRESHOLD = 15;
 # Background averaging
 BACK_AVG = 30; 
 BACK_BLUR = 31;
@@ -45,25 +33,20 @@ inv_f_mask = None
 filt = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(61,61));
 filt2 = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(31,31));
 
+screen = curses.initscr()
+screen.nodelay(1)
+curses.noecho()
 mask = None
 fgbg = cv2.createBackgroundSubtractorMOG2(detectShadows = False)
 
 # Opening/Closing filters
 filt = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5));
 
-
 def load_images():
     global virtual_background
     global foreground
     global f_mask
     global inv_f_mask
-
-    # load real background
-    frames = []
-    for _ in range(BACK_AVG):
-        _,frame = cap.read();
-        frame = cv2.GaussianBlur(frame,(BACK_BLUR ,BACK_BLUR),0);
-        fgbg.apply(frame)
     
     # load the virtual background
     virtual_background = cv2.imread("background.jpg")
@@ -78,10 +61,14 @@ def load_images():
     f_mask = cv2.resize(f_mask, (width, height))
     f_mask = cv2.cvtColor(f_mask, cv2.COLOR_BGR2GRAY)
     inv_f_mask = 1 - f_mask
-
-def handler(signal_received, frame):
-    load_images();
-    stdscr.addstr('Reloaded the virtual_background and foreground images\n')
+    
+def update_real_background():
+    # load real background
+    frames = []
+    for _ in range(BACK_AVG):
+        _,frame = cap.read();
+        frame = cv2.GaussianBlur(frame,(BACK_BLUR ,BACK_BLUR),0);
+        fgbg.apply(frame)
 
 def get_mask(frame):
     mask = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY);
@@ -94,7 +81,7 @@ def get_mask(frame):
     mask = cv2.GaussianBlur(mask,(BACK_BLUR ,BACK_BLUR),0);
     return mask
 
-def get_frame(cap, virtual_background):
+def get_frame(cap):
     _,frame = cap.read();
 
     mask = get_mask(frame);
@@ -108,29 +95,31 @@ def get_frame(cap, virtual_background):
 
     return frame
 
-if __name__ == '__main__':
-#    signal(SIGINT, handler)
-#    height, width = stdscr.getmaxyx()
-    
-    stdscr.addstr('Simple fake camera\n')
-    stdscr.addstr('Press any key to capture virtual_background\n');
-    curses.noecho();
-    stdscr.getch();
-    stdscr.nodelay(1);
-    
+if __name__ == '__main__':    
     load_images();
-    stdscr.addstr('Running...\n')
-    stdscr.addstr('Please press CTRL-\ to exit.\n')
-    stdscr.addstr('Please CTRL-C to reload the virtual_background and foreground images\n')
-    stdscr.refresh()
+    screen.addstr('Simple fake camera\n')
+    screen.addstr('Press any key to capture virtual_background\n');
+    cv2.waitKey();
+    update_real_background()
+    
+    screen.addstr('Running...\n')
+    screen.addstr('Press Q to quit\n')
+    screen.addstr('Press U to update the real background\n')
+    screen.addstr('Press V to reload the virtual_background and foreground images\n')
 
-#    curses.noecho() # Dont show inputs
     # frames forever
     while True:
-#        curses.cbreak()
-#        signal(SIGINT, handler)
-        frame = get_frame(cap, virtual_background)
-#        _,frame = cap.read()
-        # fake webcam expects RGB
+        k = screen.getch()
+        if k == ord('q'):
+            break
+        elif k == ord('u'):
+            update_real_background();
+        elif k == ord('v'):
+            load_images();
+        frame = get_frame(cap)
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         fake.schedule_frame(frame)
+        
+    curses.nocbreak();
+    curses.endwin();
+    cap.release();
