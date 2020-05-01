@@ -39,9 +39,9 @@ options.
 On a open terminal window, do
 
     cd fakecam
-    python3 fake2.py
+    python3 fake.py
 
-While the program is running, you may press:
+While the program is running, you may press (case-insensitive):
 
   - 'u' to refresh background
   - 'v' to reload your virtual background
