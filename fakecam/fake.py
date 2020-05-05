@@ -1,7 +1,6 @@
 import os
 import cv2
 import numpy as np
-import requests
 import pyfakewebcam
 import curses
 
