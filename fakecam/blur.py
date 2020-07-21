@@ -1,8 +1,10 @@
+#!/usr/bin/env python3
 import os
 import cv2
 import numpy as np
 import pyfakewebcam
 import curses
+import threading
 
 # setup access to the *real* webcam
 cap = cv2.VideoCapture('/dev/video2')
@@ -46,7 +48,9 @@ def update_real_background():
     # load real background
     frames = []
     for _ in range(BACK_AVG):
-        _,frame = cap.read();
+        retval = False;
+        while retval==False:
+            retval,frame = cap.read();
         frame = cv2.GaussianBlur(frame,(BACK_BLUR ,BACK_BLUR),0);
         fgbg.apply(frame)
 
@@ -61,8 +65,10 @@ def get_mask(frame):
     mask = cv2.GaussianBlur(mask,(BACK_BLUR ,BACK_BLUR),0);
     return mask
 
-def get_frame(cap):
-    _,frame = cap.read();
+def get_frame():
+    retval = False;
+    while retval==False:
+        retval,frame = cap.read();
 
     mask = get_mask(frame);
     blur = cv2.GaussianBlur(frame,(BACK_BLUR ,BACK_BLUR),0);
@@ -71,8 +77,8 @@ def get_frame(cap):
     for c in range(frame.shape[2]):
         frame[:,:,c] = frame[:,:,c] * mask + blur[:,:,c] * (1 - mask)
 
-
-    return frame
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    fake.schedule_frame(frame)
 
 if __name__ == '__main__':    
     screen.addstr('Simple fake camera\n')
@@ -83,6 +89,8 @@ if __name__ == '__main__':
     screen.addstr('Running...\n')
     screen.addstr('Press Q to quit\n')
     screen.addstr('Press U to update the real background\n')
+    
+
 
     # frames forever
     while True:
@@ -91,9 +99,7 @@ if __name__ == '__main__':
             break
         elif k == ord('u') or k == ord('U'):
             update_real_background();
-        frame = get_frame(cap)
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        fake.schedule_frame(frame)
+
         
     curses.nocbreak();
     curses.endwin();
